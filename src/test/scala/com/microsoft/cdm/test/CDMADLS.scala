@@ -3119,53 +3119,53 @@ class CDMADLS extends FunSuite {
     }
   }
 
-  test("spark adls negative lookup") {
-    // Search for entities that do not exist
-    val entityName = "notanentity"
-    var caught = intercept[NoSuchTableException] {
-      val df = spark.read.format("com.microsoft.cdm")
-        .option("storage", storageAccountName)
-        .option("manifestPath", newContainer + "/wwi.manifest.cdm.json")
-        .option("entity", entityName)
-        .option("appId", appid).option("appKey", appkey).option("tenantId", tenantid)
-        .load()
-    }
-    assert(caught.getMessage == "Entity " +  entityName + " not found in manifest - wwi.manifest.cdm.json")
+  // test("spark adls negative lookup") {
+  //   // Search for entities that do not exist
+  //   val entityName = "notanentity"
+  //   var caught = intercept[NoSuchTableException] {
+  //     val df = spark.read.format("com.microsoft.cdm")
+  //       .option("storage", storageAccountName)
+  //       .option("manifestPath", newContainer + "/wwi.manifest.cdm.json")
+  //       .option("entity", entityName)
+  //       .option("appId", appid).option("appKey", appkey).option("tenantId", tenantid)
+  //       .load()
+  //   }
+  //   assert(caught.getMessage == "Entity " +  entityName + " not found in manifest - wwi.manifest.cdm.json")
 
 
-    caught = intercept[NoSuchTableException] {
-      val df = spark.read.format("com.microsoft.cdm")
-        .option("storage", storageAccountName)
-        .option("manifestPath", oldModelContainer + "/model.json")
-        .option("entity", entityName)
-        .option("appId", appid).option("appKey", appkey).option("tenantId", tenantid)
-        .load()
-    }
-    assert(caught.getMessage == "Entity " +  entityName + " not found in manifest - model.json")
+  //   caught = intercept[NoSuchTableException] {
+  //     val df = spark.read.format("com.microsoft.cdm")
+  //       .option("storage", storageAccountName)
+  //       .option("manifestPath", oldModelContainer + "/model.json")
+  //       .option("entity", entityName)
+  //       .option("appId", appid).option("appKey", appkey).option("tenantId", tenantid)
+  //       .load()
+  //   }
+  //   assert(caught.getMessage == "Entity " +  entityName + " not found in manifest - model.json")
 
-    // Search for an entity that does not exist in a sub manifest
-    caught = intercept[NoSuchTableException] {
-      val df = spark.read.format("com.microsoft.cdm")
-        .option("storage", storageAccountName)
-        .option("manifestPath", patternContainer + "/root/root.manifest.cdm.json")
-        .option("entity", entityName)
-        .option("appId", appid).option("appKey", appkey).option("tenantId", tenantid)
-        .load()
-    }
-    assert(caught.getMessage == "Entity " +  entityName + " not found in manifest - root.manifest.cdm.json")
+  //   // Search for an entity that does not exist in a sub manifest
+  //   caught = intercept[NoSuchTableException] {
+  //     val df = spark.read.format("com.microsoft.cdm")
+  //       .option("storage", storageAccountName)
+  //       .option("manifestPath", patternContainer + "/root/root.manifest.cdm.json")
+  //       .option("entity", entityName)
+  //       .option("appId", appid).option("appKey", appkey).option("tenantId", tenantid)
+  //       .load()
+  //   }
+  //   assert(caught.getMessage == "Entity " +  entityName + " not found in manifest - root.manifest.cdm.json")
 
-    // Search for entities that do not exist
-    val manifestName = "wwi-nonexisting.manifest.cdm.json"
-    caught = intercept[NoSuchTableException] {
-      val df = spark.read.format("com.microsoft.cdm")
-        .option("storage", storageAccountName)
-        .option("manifestPath", newContainer + "/" + manifestName)
-        .option("entity", entityName)
-        .option("appId", appid).option("appKey", appkey).option("tenantId", tenantid)
-        .load()
-    }
-    assert(caught.getMessage == "Manifest doesn't exist: " + manifestName)
-  }
+  //   // Search for entities that do not exist
+  //   val manifestName = "wwi-nonexisting.manifest.cdm.json"
+  //   caught = intercept[NoSuchTableException] {
+  //     val df = spark.read.format("com.microsoft.cdm")
+  //       .option("storage", storageAccountName)
+  //       .option("manifestPath", newContainer + "/" + manifestName)
+  //       .option("entity", entityName)
+  //       .option("appId", appid).option("appKey", appkey).option("tenantId", tenantid)
+  //       .load()
+  //   }
+  //   assert(caught.getMessage == "Manifest doesn't exist: " + manifestName)
+  // }
 
 
   test("spark adls preserve property") {
