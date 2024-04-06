@@ -10,7 +10,7 @@ import com.microsoft.commondatamodel.objectmodel.cdm.{CdmAttributeGroupDefinitio
 import com.microsoft.commondatamodel.objectmodel.enums.{CdmDataFormat, CdmObjectType, CdmPropertyName}
 import com.microsoft.commondatamodel.objectmodel.persistence.cdmfolder.{AttributeGroupPersistence, TypeAttributePersistence}
 import com.microsoft.commondatamodel.objectmodel.resolvedmodel.ResolveContext
-import com.microsoft.commondatamodel.objectmodel.storage.{AdlsAdapter, CdmStandardsAdapter, GithubAdapter, ResourceAdapter, StorageAdapter}
+import com.microsoft.commondatamodel.objectmodel.storage.{AdlsAdapter, CdmCustomPackageAdapter, CdmStandardsAdapter, GithubAdapter, ResourceAdapter, StorageAdapterBase}
 import com.microsoft.commondatamodel.objectmodel.utilities.JMapper
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.types.{ArrayType, DataType, DecimalType, Metadata, MetadataBuilder, StructField, StructType}
@@ -35,6 +35,7 @@ class CDMModelCommon (storage: String,
 
   var logger  = LoggerFactory.getLogger(classOf[CDMModelCommon])
   val cdmCorpus = new CdmCorpusDefinition
+  cdmCorpus.getStorage.unmount("cdm")
   cdmCorpus.setEventCallback(CDMCallback)
   val platform = Environment.sparkPlatform
 
@@ -47,7 +48,7 @@ class CDMModelCommon (storage: String,
   cdmCorpus.getStorage.mount(Constants.SPARK_NAMESPACE, adlsAdapter)
 
 
-  val cdmSourceAdapter = if (cdmSource == CDMSource.BUILTIN) new ResourceAdapter else new CdmStandardsAdapter
+  val cdmSourceAdapter = new ResourceAdapter
   cdmCorpus.getStorage.mount("cdm", cdmSourceAdapter)
   cdmCorpus.getStorage().setMaxConcurrentReads(maxCDMThreads);
   /* If "", use the CdmStandardsAdapter as the model root */
@@ -63,6 +64,7 @@ class CDMModelCommon (storage: String,
       try {
         val config = cdmCorpus.getStorage.fetchAdapter(Constants.SPARK_MODELROOT_NAMESPACE).readAsync("config.json").get()
         cdmCorpus.getStorage.mountFromConfig(config)
+        cdmCorpus.getStorage.mount("cdm", new OverridenCdmStandardsAdapter)
       }
       catch {
         case e: java.util.concurrent.ExecutionException => {
@@ -104,6 +106,7 @@ class CDMModelCommon (storage: String,
       val config = cdmCorpus.getStorage.fetchAdapter("configAdls").readAsync("config.json").get()
       SparkCDMLogger.log(Level.INFO, "Overriding the config.json path..", logger)
       cdmCorpus.getStorage.mountFromConfig(config)
+      cdmCorpus.getStorage.mount("cdm", new OverridenCdmStandardsAdapter)
     }
     catch {
       case e: java.util.concurrent.ExecutionException => throw new IllegalArgumentException(String.format(Messages.configJsonPathNotFound, overrideConfigPath))
@@ -112,7 +115,7 @@ class CDMModelCommon (storage: String,
 
   // set the same secret/token to all the Adls Adapter definitions, since we are using a single ADLS account.
   def setAuthMechanismTOAllNamespace() = {
-    cdmCorpus.getStorage.getNamespaceAdapters.values.asScala.foreach({ case (value: StorageAdapter) =>
+    cdmCorpus.getStorage.getNamespaceAdapters.values.asScala.foreach({ case (value: StorageAdapterBase) =>
       if(value.isInstanceOf[AdlsAdapter]) {
         if (auth.getAuthType == CdmAuthType.Token.toString()) {
           value.asInstanceOf[AdlsAdapter].setTokenProvider(tokenProvider.get)
@@ -467,6 +470,10 @@ class CDMModelCommon (storage: String,
           if (value != null) mdb.putBoolean(CdmPropertyName.VALUE_CONSTRAINED_TO_LIST.toString, value)
         }
         case CdmPropertyName.VERSION=>  null
+        case CdmPropertyName.IS_RESOLVED=> {
+        }
+        case CdmPropertyName.IS_INCREMENTAL=> {
+        }
       }
     }
     mdb.build()

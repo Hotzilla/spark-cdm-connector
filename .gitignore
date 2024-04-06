@@ -2,3 +2,5 @@
 .metals/
 .vscode/
 target/
+sbt.json
+build.properties
