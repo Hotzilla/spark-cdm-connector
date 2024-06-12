@@ -17,7 +17,7 @@ pomPostProcess := { (node: XmlNode) =>
   }).transform(node).head
 }
 
-version := "spark3.3-1.19.6"
+version := "spark3.3-1.19.7"
 
 crossPaths := false
 ThisBuild / scalaVersion := "2.12.15"
