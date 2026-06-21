@@ -1,0 +1,91 @@
+name: Release Spark 3.5 Connector
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Git tag to create/use for the release"
+        required: true
+        default: "spark3.5-1.19.7"
+      release_name:
+        description: "GitHub Release title"
+        required: true
+        default: "Spark CDM Connector spark3.5-1.19.7"
+      prerelease:
+        description: "Mark the GitHub Release as a prerelease"
+        type: boolean
+        required: true
+        default: false
+  push:
+    tags:
+      - "spark3.5-*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish Spark 3.5 release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: sbt
+
+      - name: Set up sbt
+        uses: sbt/setup-sbt@v1
+
+      - name: Build assembly jar
+        run: sbt clean assembly
+
+      - name: Stage release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          jar_path="$(find target -maxdepth 1 -type f -name 'spark-cdm-connector-assembly-spark3.5-*.jar' | sort | tail -n 1)"
+          if [[ -z "${jar_path}" ]]; then
+            echo "No Spark 3.5 assembly jar found under target/" >&2
+            exit 1
+          fi
+          asset_name="spark-cdm-connector-assembly-synapse-${jar_path##*assembly-}"
+          cp "${jar_path}" "release-assets/${asset_name}"
+          (cd release-assets && sha256sum "${asset_name}" > "${asset_name}.sha256")
+          echo "jar_path=release-assets/${asset_name}" >> "${GITHUB_ENV}"
+          echo "checksum_path=release-assets/${asset_name}.sha256" >> "${GITHUB_ENV}"
+
+      - name: Resolve release metadata
+        id: release_metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            echo "tag_name=${{ inputs.tag_name }}" >> "${GITHUB_OUTPUT}"
+            echo "release_name=${{ inputs.release_name }}" >> "${GITHUB_OUTPUT}"
+            echo "prerelease=${{ inputs.prerelease }}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "tag_name=${GITHUB_REF_NAME}" >> "${GITHUB_OUTPUT}"
+            echo "release_name=Spark CDM Connector ${GITHUB_REF_NAME}" >> "${GITHUB_OUTPUT}"
+            echo "prerelease=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_metadata.outputs.tag_name }}
+          name: ${{ steps.release_metadata.outputs.release_name }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ steps.release_metadata.outputs.prerelease }}
+          generate_release_notes: true
+          files: |
+            ${{ env.jar_path }}
+            ${{ env.checksum_path }}
