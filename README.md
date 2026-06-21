@@ -1,4 +1,6 @@
 # ❗IMPORTANT NOTICE❗
+This is unofficial spark3.5 migration of the Microsoft's CDM connector project.
+
 The CDM library, which this connector is reliant on, is deprecating the CDM Schema Store. Please upgrade your connector version to the latest version [spark3.3-1.19.7](https://github.com/Azure/spark-cdm-connector/releases/tag/spark3.3-1.19.7) to ensure there is no disruption in your workflows.
 Full details in: https://github.com/Azure/spark-cdm-connector/issues/162
 
