@@ -17,7 +17,6 @@ import org.apache.hadoop.fs.{FSDataOutputStream, Path}
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder, StructType}
 import org.scalatest.{FunSuite, PrivateMethodTester}
 
-import scala.util.parsing.json._
 import scala.collection.JavaConverters._
 
 class CDMUnitTests extends FunSuite with PrivateMethodTester  {
@@ -93,7 +92,7 @@ class CDMUnitTests extends FunSuite with PrivateMethodTester  {
     cdmCorpus.getStorage.setDefaultNamespace("adls")
     cdmCorpus.getStorage.mount("adls", adlsAdapter)
     val result = cdmCorpus.getStorage.fetchAdapter("adls").readAsync("adls:/nestedImplicit/config.json").get()
-    val json = JSON.parseFull(result)
+    val json = JMapper.MAP.readTree(result)
     print(json)
   }
 
