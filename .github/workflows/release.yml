@@ -1,0 +1,125 @@
+name: Release Spark 3.5 jar
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "GitHub release tag to create or update"
+        required: true
+        default: "spark3.5-1.19.7"
+      prerelease:
+        description: "Mark the GitHub release as a prerelease"
+        required: true
+        default: false
+        type: boolean
+  push:
+    tags:
+      - "spark3.5-*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish Spark 3.5 assembly jar
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "11"
+          cache: sbt
+
+      - name: Set up sbt
+        uses: sbt/setup-sbt@v1
+
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            tag="${{ inputs.release_tag }}"
+            prerelease="${{ inputs.prerelease }}"
+          else
+            tag="${GITHUB_REF_NAME}"
+            prerelease="false"
+          fi
+
+          if [[ ! "${tag}" =~ ^spark3\.5- ]]; then
+            echo "Release tag must start with spark3.5-; got '${tag}'." >&2
+            exit 1
+          fi
+
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+          echo "prerelease=${prerelease}" >> "${GITHUB_OUTPUT}"
+
+      - name: Verify build is configured for Spark 3.5
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Eq '^version := "spark3\.5-' build.sbt
+          grep -Eq '"org\.apache\.spark" %% "spark-sql" % "3\.5\.' build.sbt
+          grep -Eq '"org\.apache\.spark" %% "spark-core" % "3\.5\.' build.sbt
+
+      - name: Build assembly jar
+        shell: bash
+        run: sbt clean assembly
+
+      - name: Stage release asset
+        id: asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t jars < <(find target -type f -name '*assembly*.jar' | sort)
+          if [[ "${#jars[@]}" -ne 1 ]]; then
+            printf 'Expected exactly one assembly jar, found %s:\n' "${#jars[@]}" >&2
+            printf '%s\n' "${jars[@]}" >&2
+            exit 1
+          fi
+
+          mkdir -p dist
+          asset="dist/spark-cdm-connector-${{ steps.meta.outputs.tag }}.jar"
+          cp "${jars[0]}" "${asset}"
+          echo "path=${asset}" >> "${GITHUB_OUTPUT}"
+          echo "name=$(basename "${asset}")" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload jar as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.asset.outputs.name }}
+          path: ${{ steps.asset.outputs.path }}
+          if-no-files-found: error
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          PRERELEASE: ${{ steps.meta.outputs.prerelease }}
+          ASSET_PATH: ${{ steps.asset.outputs.path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          release_notes="Spark 3.5 assembly jar for spark-cdm-connector. Attach this jar to your Spark job with --jars or your workspace/library installation flow."
+
+          prerelease_flag=()
+          if [[ "${PRERELEASE}" == "true" ]]; then
+            prerelease_flag+=(--prerelease)
+          fi
+
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" "${ASSET_PATH}" --clobber
+          else
+            gh release create "${TAG}" "${ASSET_PATH}" \
+              --target "${GITHUB_SHA}" \
+              --title "${TAG}" \
+              --notes "${release_notes}" \
+              "${prerelease_flag[@]}"
+          fi
